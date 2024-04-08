@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"cb1d2c3a-cff2-4656-9e45-565c37d1502d",
+	"author":	"zedr0n",
+	"description":	{
+		"":	"Board Game Organizer"
+	},
+	"version":	"0.1",
+	"runOnStartup":	false,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
