@@ -32,6 +32,7 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 # they are not released and garbage collected.
 local_handlers = []
 
+created_sketches = []
 
 # Executed when add-in is run.
 def start():
@@ -83,6 +84,8 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # TODO Define the dialog for your command by adding different inputs to the command.
 
+    #inputs.addFloatSliderCommandInput('test','Test', )
+
     dropdown_input = inputs.addDropDownCommandInput('dropdown','Components', adsk.core.DropDownStyles.TextListDropDownStyle)
     dropdown_input.listItems.add("Divider", True)
     dropdown_input.listItems.add("Tray", False)
@@ -100,12 +103,15 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     label_width_input = inputs.addValueInput('label_width', 'Label width', 'mm', adsk.core.ValueInput.createByReal(63.5/10/4))
     label_offset_input = inputs.addValueInput('label_offset', 'Label offset', 'mm', adsk.core.ValueInput.createByReal(63.5/10/4))
     label_fillet_input = inputs.addValueInput('label_fillet', 'Label fillet', 'mm', adsk.core.ValueInput.createByReal(4/10))
+    label_text_input = inputs.addTextBoxCommandInput('label_text', 'Label text', 'Label', 1, False)
+    label_text_height = inputs.addValueInput('label_text_height', 'Text height', 'mm', adsk.core.ValueInput.createByReal(0.6/10))
 
     # Make length, width, height inputs initially invisible if not "Divider"
     if dropdown_input.selectedItem.name != "Divider":
         length_input.isVisible = False
         width_input.isVisible = False
         height_input.isVisible = False
+        has_label_input.isVisible = False
 
     if not has_label_input.value:
         left_right_input.isVisible = False
@@ -113,6 +119,8 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
         label_width_input.isVisible = False
         label_offset_input.isVisible = False
         label_fillet_input.isVisible = False
+        label_text_input.isVisible = False
+        label_text_height.isVisible = False
 
     # Create a simple text box input.
     #inputs.addTextBoxCommandInput('text_box', 'Some Text', 'Enter some text.', 1, False)
@@ -131,58 +139,67 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
 
+def get_divider(args: adsk.core.CommandEventArgs):
+    inputs = args.command.commandInputs
+
+    length_input: adsk.core.ValueCommandInput = inputs.itemById('length')
+    width_input: adsk.core.ValueCommandInput = inputs.itemById('width')
+    height_input: adsk.core.ValueCommandInput = inputs.itemById('height')
+    has_label_input: adsk.core.BoolValueCommandInput = inputs.itemById('has_label')
+    label_length_input: adsk.core.ValueCommandInput = inputs.itemById('label_length')
+    label_width_input: adsk.core.ValueCommandInput = inputs.itemById('label_width')
+    label_offset_input: adsk.core.ValueCommandInput = inputs.itemById('label_offset')
+    label_fillet_input: adsk.core.ValueCommandInput = inputs.itemById('label_fillet')
+    left_right_input: adsk.core.BoolValueCommandInput = inputs.itemById('left_right')
+    label_text_input: adsk.core.TextBoxCommandInput = inputs.itemById('label_text')            
+    label_text_height_input: adsk.core.ValueCommandInput = inputs.itemById('label_text_height')
+
+    length = length_input.value
+    width = width_input.value
+    height = height_input.value
+    if has_label_input.value:
+        divider = Divider(
+            Length = length, 
+            Width = width, 
+            Height = height,
+            LabelLeftRight = left_right_input.value,
+            LabelOffset = label_offset_input.value,
+            LabelLength = label_length_input.value,
+            LabelWidth = label_width_input.value,
+            LabelFillet = label_fillet_input.value,
+            LabelText = label_text_input.formattedText,
+            TextHeight = label_text_height_input.value)
+    else:
+        divider = Divider(
+            Length = length, 
+            Width = width, 
+            Height = height)
+        
+    return divider
+
+def cleanup_sketches():
+    for sketch in created_sketches:
+        if sketch.isValid:
+            sketch.deleteMe()
+    created_sketches.clear()
+
 # This event handler is called when the user clicks the OK button in the command dialog or 
 # is immediately called after the created event not command inputs were created for the dialog.
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Execute Event')
 
+    cleanup_sketches()
+
     # TODO ******************************** Your code here ********************************
 
     # Get a reference to your command's inputs.
     inputs = args.command.commandInputs
-    text_box: adsk.core.TextBoxCommandInput = inputs.itemById('text_box')
-    value_input: adsk.core.ValueCommandInput = inputs.itemById('value_input')
     dropdown_input: adsk.core.DropDownCommandInput = inputs.itemById('dropdown')    
 
     if dropdown_input.selectedItem.name == "Divider":
-        length_input: adsk.core.ValueCommandInput = inputs.itemById('length')
-        width_input: adsk.core.ValueCommandInput = inputs.itemById('width')
-        height_input: adsk.core.ValueCommandInput = inputs.itemById('height')
-        has_label_input: adsk.core.BoolValueCommandInput = inputs.itemById('has_label')
-        label_length_input: adsk.core.ValueCommandInput = inputs.itemById('label_length')
-        label_width_input: adsk.core.ValueCommandInput = inputs.itemById('label_width')
-        label_offset_input: adsk.core.ValueCommandInput = inputs.itemById('label_offset')
-        label_fillet_input: adsk.core.ValueCommandInput = inputs.itemById('label_fillet')
-        left_right_input: adsk.core.BoolValueCommandInput = inputs.itemById('left_right')            
-
-        length = length_input.value
-        width = width_input.value
-        height = height_input.value
-        if has_label_input.value:
-            divider = Divider(
-                Length = length, 
-                Width = width, 
-                Height = height,
-                LabelLeftRight = left_right_input.value,
-                LabelOffset = label_offset_input.value,
-                LabelLength = label_length_input.value,
-                LabelWidth = label_width_input.value,
-                LabelFillet = label_fillet_input.value)
-        else:
-            divider = Divider(
-                Length = length, 
-                Width = width, 
-                Height = height)
+        divider = get_divider(args)
         divider.generate_fusion()
-
-
-    # Do something interesting
-    # text = text_box.text
-    # expression = value_input.expression
-    # msg = f'Your text: {text}<br>Your value: {expression}'
-    # ui.messageBox(msg)
-
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.
 def command_preview(args: adsk.core.CommandEventArgs):
@@ -190,6 +207,15 @@ def command_preview(args: adsk.core.CommandEventArgs):
     futil.log(f'{CMD_NAME} Command Preview Event')
     inputs = args.command.commandInputs
 
+    # Get a reference to your command's inputs.
+    inputs = args.command.commandInputs
+    dropdown_input: adsk.core.DropDownCommandInput = inputs.itemById('dropdown')    
+
+    if dropdown_input.selectedItem.name == "Divider":
+        divider = get_divider(args)
+        sketch = divider.create_sketch()
+        divider.create_sketch_text(sketch)
+        created_sketches.append(sketch)
 
 # This event handler is called when the user changes anything in the command dialog
 # allowing you to modify values of other inputs based on that change.
@@ -199,15 +225,17 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
 
     if changed_input.id == 'dropdown':
         inputs = changed_input.commandInputs
-        lengthInput = inputs.itemById('length')
-        widthInput = inputs.itemById('width')
-        heightInput = inputs.itemById('height')
-        
+        length_input = inputs.itemById('length')
+        width_input = inputs.itemById('width')
+        height_input = inputs.itemById('height')
+        has_label_input = inputs.itemById('has_label')
+
         # Update visibility based on the dropdown selection
         isVisible = changed_input.selectedItem.name == "Divider"
-        lengthInput.isVisible = isVisible
-        widthInput.isVisible = isVisible
-        heightInput.isVisible = isVisible
+        length_input.isVisible = isVisible
+        width_input.isVisible = isVisible
+        height_input.isVisible = isVisible
+        has_label_input.isVisible = isVisible
 
     if changed_input.id == 'has_label':        
         changed_input = adsk.core.BoolValueCommandInput.cast(changed_input)
@@ -216,11 +244,15 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         label_width_input = inputs.itemById('label_width')    
         label_offset_input = inputs.itemById('label_offset')    
         label_fillet_input = inputs.itemById('label_fillet')    
+        label_text_input = inputs.itemById('label_text')
+        label_text_height_input = inputs.itemById('label_text_height')
         left_right_input.isVisible = changed_input.value
         label_length_input.isVisible = changed_input.value
         label_width_input.isVisible = changed_input.value
         label_offset_input.isVisible = changed_input.value        
         label_fillet_input.isVisible = changed_input.value
+        label_text_input.isVisible = changed_input.value
+        label_text_height_input.isVisible = changed_input.value
 
     # General logging for debug.
     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
@@ -232,15 +264,7 @@ def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Validate Input Event')
 
-    inputs = args.inputs
-    
-    # Verify the validity of the input values. This controls if the OK button is enabled or not.
-    valueInput = inputs.itemById('value_input')
-    if valueInput.value >= 0:
-        args.areInputsValid = True
-    else:
-        args.areInputsValid = False
-        
+    inputs = args.inputs        
 
 # This event handler is called when the command terminates.
 def command_destroy(args: adsk.core.CommandEventArgs):
