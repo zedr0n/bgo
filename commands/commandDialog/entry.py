@@ -7,7 +7,8 @@ from ... import config
 app = adsk.core.Application.get()
 ui = app.userInterface
 
-from ...Element import Divider
+from ...Divider import Divider
+from ...Tray import Tray
 
 # TODO *** Specify the command identity information. ***
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_cmdDialog'
@@ -90,7 +91,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     dropdown_input.listItems.add("Divider", True)
     dropdown_input.listItems.add("Tray", False)
 
-    has_label_input = inputs.addBoolValueInput('has_label', 'Has Label', True)
+    #has_label_input = inputs.addBoolValueInput('has_label', 'Has Label', True)
 
     # Add length, width, height inputs (initially visible)
 
@@ -100,27 +101,39 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     left_right_input = inputs.addBoolValueInput('left_right', 'Label offset from left', True)
     label_length_input = inputs.addValueInput('label_length', 'Label length', 'mm', adsk.core.ValueInput.createByReal(6/10))
-    label_width_input = inputs.addValueInput('label_width', 'Label width', 'mm', adsk.core.ValueInput.createByReal(63.5/10/4))
-    label_offset_input = inputs.addValueInput('label_offset', 'Label offset', 'mm', adsk.core.ValueInput.createByReal(63.5/10/4))
+    #label_width_input = inputs.addValueInput('label_width', 'Label width', 'mm', adsk.core.ValueInput.createByReal(63.5/10/4))
+    label_width_input = inputs.addFloatSliderCommandInput('label_width', 'Label width(%)', '', 0.0, 0.999)
+    #label_offset_input = inputs.addValueInput('label_offset', 'Label offset', 'mm', adsk.core.ValueInput.createByReal(63.5/10/4))
+    label_offset_input = inputs.addFloatSliderCommandInput('label_offset', 'Label offset(%)', '', 0.0, 0.999)
     label_fillet_input = inputs.addValueInput('label_fillet', 'Label fillet', 'mm', adsk.core.ValueInput.createByReal(4/10))
     label_text_input = inputs.addTextBoxCommandInput('label_text', 'Label text', 'Label', 1, False)
     label_text_height = inputs.addValueInput('label_text_height', 'Text height', 'mm', adsk.core.ValueInput.createByReal(0.6/10))
 
+    base_thickness_input = inputs.addValueInput('base_thickness', 'Base thickness', 'mm', adsk.core.ValueInput.createByReal(0.02))
+    wall_thickness_input = inputs.addValueInput('wall_thickness', 'Wall thickness', 'mm', adsk.core.ValueInput.createByReal(0.02))
+    cutout_ratio_input = inputs.addFloatSliderCommandInput('cutout_ratio', 'Cutout ratio(%)', '', 0.0, 0.5)
+
     # Make length, width, height inputs initially invisible if not "Divider"
-    if dropdown_input.selectedItem.name != "Divider":
+    if dropdown_input.selectedItem.name != "Divider" and dropdown_input.selectedItem.name != "Tray":
         length_input.isVisible = False
         width_input.isVisible = False
         height_input.isVisible = False
-        has_label_input.isVisible = False
 
-    if not has_label_input.value:
-        left_right_input.isVisible = False
-        label_length_input.isVisible = False
+    if dropdown_input.selectedItem.name != "Divider":
         label_width_input.isVisible = False
-        label_offset_input.isVisible = False
-        label_fillet_input.isVisible = False
-        label_text_input.isVisible = False
-        label_text_height.isVisible = False
+
+    if dropdown_input.selectedItem.name != 'Tray':
+        base_thickness_input.isVisible = False
+        wall_thickness_input.isVisible = False
+        cutout_ratio_input.isVisible = False
+
+    left_right_input.isVisible = False
+    label_length_input.isVisible = False
+    #label_width_input.isVisible = False
+    label_offset_input.isVisible = False
+    label_fillet_input.isVisible = False
+    label_text_input.isVisible = False
+    label_text_height.isVisible = False
 
     # Create a simple text box input.
     #inputs.addTextBoxCommandInput('text_box', 'Some Text', 'Enter some text.', 1, False)
@@ -138,6 +151,26 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     futil.add_handler(args.command.validateInputs, command_validate_input, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
+def get_tray(args : adsk.core.CommandEventArgs):
+    inputs = args.command.commandInputs
+
+    length_input: adsk.core.ValueCommandInput = inputs.itemById('length')
+    width_input: adsk.core.ValueCommandInput = inputs.itemById('width')
+    height_input: adsk.core.ValueCommandInput = inputs.itemById('height')
+    base_thickness_input: adsk.core.ValueCommandInput = inputs.itemById('base_thickness')
+    wall_thickness_input: adsk.core.ValueCommandInput = inputs.itemById('wall_thickness')
+    cutout_ratio_input: adsk.core.FloatSliderCommandInput = inputs.itemById('cutout_ratio')
+
+    tray = Tray(
+            Length = length_input.value, 
+            Width = width_input.value, 
+            Height = height_input.value, 
+            WallThickness = wall_thickness_input.value,
+            BaseThickness = base_thickness_input.value,
+            CutoutRatio = cutout_ratio_input.valueOne       
+    )
+
+    return tray
 
 def get_divider(args: adsk.core.CommandEventArgs):
     inputs = args.command.commandInputs
@@ -145,27 +178,30 @@ def get_divider(args: adsk.core.CommandEventArgs):
     length_input: adsk.core.ValueCommandInput = inputs.itemById('length')
     width_input: adsk.core.ValueCommandInput = inputs.itemById('width')
     height_input: adsk.core.ValueCommandInput = inputs.itemById('height')
-    has_label_input: adsk.core.BoolValueCommandInput = inputs.itemById('has_label')
-    label_length_input: adsk.core.ValueCommandInput = inputs.itemById('label_length')
-    label_width_input: adsk.core.ValueCommandInput = inputs.itemById('label_width')
-    label_offset_input: adsk.core.ValueCommandInput = inputs.itemById('label_offset')
+    #has_label_input: adsk.core.BoolValueCommandInput = inputs.itemById('has_label')
+    label_length_input: adsk.core.ValueCommandInput = inputs.itemById('label_length')    
+    #label_width_input: adsk.core.ValueCommandInput = inputs.itemById('label_width')
+    label_width_input: adsk.core.FloatSliderCommandInput = inputs.itemById('label_width')    
+    #label_offset_input: adsk.core.ValueCommandInput = inputs.itemById('label_offset')
+    label_offset_input: adsk.core.FloatSliderCommandInput = inputs.itemById('label_offset')    
     label_fillet_input: adsk.core.ValueCommandInput = inputs.itemById('label_fillet')
     left_right_input: adsk.core.BoolValueCommandInput = inputs.itemById('left_right')
     label_text_input: adsk.core.TextBoxCommandInput = inputs.itemById('label_text')            
-    label_text_height_input: adsk.core.ValueCommandInput = inputs.itemById('label_text_height')
+    label_text_height_input: adsk.core.ValueCommandInput = inputs.itemById('label_text_height')    
 
     length = length_input.value
     width = width_input.value
     height = height_input.value
-    if has_label_input.value:
+    has_label = label_width_input.valueOne > 0
+    if has_label:
         divider = Divider(
             Length = length, 
             Width = width, 
             Height = height,
             LabelLeftRight = left_right_input.value,
-            LabelOffset = label_offset_input.value,
+            LabelOffset = label_offset_input.valueOne * width,
             LabelLength = label_length_input.value,
-            LabelWidth = label_width_input.value,
+            LabelWidth = label_width_input.valueOne * width,
             LabelFillet = label_fillet_input.value,
             LabelText = label_text_input.formattedText,
             TextHeight = label_text_height_input.value)
@@ -200,6 +236,9 @@ def command_execute(args: adsk.core.CommandEventArgs):
     if dropdown_input.selectedItem.name == "Divider":
         divider = get_divider(args)
         divider.generate_fusion()
+    elif dropdown_input.selectedItem.name == "Tray":
+        tray = get_tray(args)
+        tray.generate_fusion()
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.
 def command_preview(args: adsk.core.CommandEventArgs):
@@ -216,6 +255,10 @@ def command_preview(args: adsk.core.CommandEventArgs):
         sketch = divider.create_sketch()
         divider.create_sketch_text(sketch)
         created_sketches.append(sketch)
+    elif dropdown_input.selectedItem.name == "Tray":
+        tray = get_tray(args)
+        sketch = tray.create_sketch()
+        created_sketches.append(sketch)
 
 # This event handler is called when the user changes anything in the command dialog
 # allowing you to modify values of other inputs based on that change.
@@ -228,17 +271,38 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         length_input = inputs.itemById('length')
         width_input = inputs.itemById('width')
         height_input = inputs.itemById('height')
-        has_label_input = inputs.itemById('has_label')
+        label_width_input = inputs.itemById('label_width')
+        #has_label_input = inputs.itemById('has_label')
 
-        # Update visibility based on the dropdown selection
-        isVisible = changed_input.selectedItem.name == "Divider"
+        isVisible = changed_input.selectedItem.name == "Divider" or changed_input.selectedItem.name == "Tray"
         length_input.isVisible = isVisible
         width_input.isVisible = isVisible
         height_input.isVisible = isVisible
-        has_label_input.isVisible = isVisible
 
-    if changed_input.id == 'has_label':        
-        changed_input = adsk.core.BoolValueCommandInput.cast(changed_input)
+        # Update visibility based on the dropdown selection
+        if changed_input.selectedItem.name == "Divider":
+            label_width_input.isVisible = True
+        else:
+            inputs.itemById('left_right').isVisible = False
+            inputs.itemById('label_length').isVisible = False
+            inputs.itemById('label_width').isVisible = False
+            inputs.itemById('label_offset').isVisible = False
+            inputs.itemById('label_fillet').isVisible = False    
+            inputs.itemById('label_text').isVisible = False
+            inputs.itemById('label_text_height').isVisible = False
+
+        if changed_input.selectedItem.name == "Tray":
+            inputs.itemById('base_thickness').isVisible = True
+            inputs.itemById('wall_thickness').isVisible = True
+            inputs.itemById('cutout_ratio').isVisible = True
+        
+        #has_label_input.isVisible = isVisible
+
+    #if changed_input.id == 'has_label':        
+    if changed_input.id == 'label_width':        
+        #changed_input = adsk.core.BoolValueCommandInput.cast(changed_input)
+        changed_input = adsk.core.FloatSliderCommandInput.cast(changed_input)
+        has_label = changed_input.valueOne > 0
         left_right_input = inputs.itemById('left_right')    
         label_length_input = inputs.itemById('label_length')    
         label_width_input = inputs.itemById('label_width')    
@@ -246,13 +310,23 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         label_fillet_input = inputs.itemById('label_fillet')    
         label_text_input = inputs.itemById('label_text')
         label_text_height_input = inputs.itemById('label_text_height')
-        left_right_input.isVisible = changed_input.value
-        label_length_input.isVisible = changed_input.value
-        label_width_input.isVisible = changed_input.value
-        label_offset_input.isVisible = changed_input.value        
-        label_fillet_input.isVisible = changed_input.value
-        label_text_input.isVisible = changed_input.value
-        label_text_height_input.isVisible = changed_input.value
+        left_right_input.isVisible = has_label
+        label_length_input.isVisible = has_label
+        #label_width_input.isVisible = has_label
+        label_offset_input.isVisible = has_label
+        label_fillet_input.isVisible = has_label
+        label_text_input.isVisible = has_label
+        label_text_height_input.isVisible = has_label
+
+    if changed_input.id == 'label_offset':
+        changed_input = adsk.core.FloatSliderCommandInput.cast(changed_input)
+        label_width_input = adsk.core.FloatSliderCommandInput.cast(inputs.itemById('label_width'))
+        label_width_input.maximumValue = 0.999 - changed_input.valueOne
+
+    if changed_input.id == 'label_width':
+        changed_input = adsk.core.FloatSliderCommandInput.cast(changed_input)
+        label_offset_input = inputs.itemById('label_offset')    
+        label_offset_input.maximumValue = 0.999 - changed_input.valueOne
 
     # General logging for debug.
     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
