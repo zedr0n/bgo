@@ -9,6 +9,8 @@ ui = app.userInterface
 
 from ...Divider import Divider
 from ...Tray import Tray
+from ...Genetic import create_etherfields
+
 
 # TODO *** Specify the command identity information. ***
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_cmdDialog'
@@ -34,6 +36,8 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 local_handlers = []
 
 created_sketches = []
+
+#etherfields = create_etherfields()
 
 # Executed when add-in is run.
 def start():
@@ -90,6 +94,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     dropdown_input = inputs.addDropDownCommandInput('dropdown','Components', adsk.core.DropDownStyles.TextListDropDownStyle)
     dropdown_input.listItems.add("Divider", True)
     dropdown_input.listItems.add("Tray", False)
+    dropdown_input.listItems.add("Game", False)
 
     #has_label_input = inputs.addBoolValueInput('has_label', 'Has Label', True)
 
@@ -151,23 +156,52 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     futil.add_handler(args.command.validateInputs, command_validate_input, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
-def get_tray(args : adsk.core.CommandEventArgs):
-    inputs = args.command.commandInputs
+def get_tray(args, offset_x = 0):
+    offset_x = 0
+    length = 0
+    width = 0
+    height = 0
+    wall_thickness = 0.02
+    base_thickness = 0.02
+    cutout_ratio = 0
+    x = 0
+    y = 0
+    z = 0
 
-    length_input: adsk.core.ValueCommandInput = inputs.itemById('length')
-    width_input: adsk.core.ValueCommandInput = inputs.itemById('width')
-    height_input: adsk.core.ValueCommandInput = inputs.itemById('height')
-    base_thickness_input: adsk.core.ValueCommandInput = inputs.itemById('base_thickness')
-    wall_thickness_input: adsk.core.ValueCommandInput = inputs.itemById('wall_thickness')
-    cutout_ratio_input: adsk.core.FloatSliderCommandInput = inputs.itemById('cutout_ratio')
+    if hasattr(args, "command"):
+        inputs = args.command.commandInputs
+
+        length_input: adsk.core.ValueCommandInput = inputs.itemById('length')
+        width_input: adsk.core.ValueCommandInput = inputs.itemById('width')
+        height_input: adsk.core.ValueCommandInput = inputs.itemById('height')
+        base_thickness_input: adsk.core.ValueCommandInput = inputs.itemById('base_thickness')
+        wall_thickness_input: adsk.core.ValueCommandInput = inputs.itemById('wall_thickness')
+        cutout_ratio_input: adsk.core.FloatSliderCommandInput = inputs.itemById('cutout_ratio')
+
+        length = length_input.value
+        width = width_input.value
+        height = height_input.value
+        base_thickness = base_thickness_input.value
+        wall_thickness = wall_thickness_input.value
+        cutout_ratio = cutout_ratio_input.valueOne
+    else:
+        length = args['Length']
+        width = args['Width']
+        height = args['Height']        
+        x = args['x']
+        y = args['y']
+        z = args['z']
 
     tray = Tray(
-            Length = length_input.value, 
-            Width = width_input.value, 
-            Height = height_input.value, 
-            WallThickness = wall_thickness_input.value,
-            BaseThickness = base_thickness_input.value,
-            CutoutRatio = cutout_ratio_input.valueOne       
+            Length = length, 
+            Width = width, 
+            Height = height, 
+            WallThickness = wall_thickness,
+            BaseThickness = base_thickness,
+            CutoutRatio = cutout_ratio,
+            x = x + offset_x,
+            y = y,
+            z = z
     )
 
     return tray
@@ -239,6 +273,15 @@ def command_execute(args: adsk.core.CommandEventArgs):
     elif dropdown_input.selectedItem.name == "Tray":
         tray = get_tray(args)
         tray.generate_fusion()
+    elif dropdown_input.selectedItem.name == "Game":
+        if etherfields is not None:
+            offset_x = 0
+            sorted_etherfields = sorted(etherfields, key = lambda x: x['x'])
+            for el in sorted_etherfields:
+                tray = get_tray(el, offset_x)
+                tray.generate_fusion()
+                offset_x += 1
+
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.
 def command_preview(args: adsk.core.CommandEventArgs):
@@ -259,6 +302,16 @@ def command_preview(args: adsk.core.CommandEventArgs):
         tray = get_tray(args)
         sketch = tray.create_sketch()
         created_sketches.append(sketch)
+    elif dropdown_input.selectedItem.name == "Game":
+        if etherfields is not None:
+            offset_x = 0
+            sorted_etherfields = sorted(etherfields, key = lambda x: x['x'])
+            for el in sorted_etherfields:
+                tray = get_tray(el, offset_x)
+                sketch = tray.create_sketch()
+                created_sketches.append(sketch)
+                offset_x += 1
+
 
 # This event handler is called when the user changes anything in the command dialog
 # allowing you to modify values of other inputs based on that change.

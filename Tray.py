@@ -3,7 +3,10 @@ from .utils import futil
 
 class Tray(Element):
     def __init__(self, **kwargs):
-        #super().__init__(**kwargs)
+        self._x = kwargs.get('x', 0)
+        self._y = kwargs.get('y', 0)
+        self._z = kwargs.get('z', 0)
+
         self._height = kwargs['Height'] 
         self._width = kwargs['Width'] 
         self._length = kwargs['Length']  
@@ -37,8 +40,7 @@ class Tray(Element):
             circle = circles.addByCenterRadius(sketch_point, radius)
             
             profile = sketch.profiles.item(0)
-            self.extrude(root_comp, profile, -self._base_thickness, futil.fusion.FeatureOperations.CutFeatureOperation)
-
+            self.extrude(root_comp, profile, -self._wall_thickness, futil.fusion.FeatureOperations.CutFeatureOperation)
 
     def generate_fusion(self):
         product = futil.app.activeProduct
@@ -53,8 +55,8 @@ class Tray(Element):
         wall_body = self.extrude(root_comp, inner_profile, self._height, futil.fusion.FeatureOperations.JoinFeatureOperation)
 
         # modify tray with cutout
-        self.create_cutout(base_body, futil.core.Vector3D.create(0, self._width, 0))
-        self.create_cutout(base_body, futil.core.Vector3D.create(self._length, 0, 0))
+        self.create_cutout(base_body, futil.core.Vector3D.create(self._x, self._y + self._width, self._z))
+        self.create_cutout(base_body, futil.core.Vector3D.create(self._x + self._length, self._y, self._z))
 
     def create_sketch(self):
         #return super().create_sketch()
@@ -70,13 +72,13 @@ class Tray(Element):
         # create 2d rectangle
         lines = sketch.sketchCurves.sketchLines
         rect = lines.addTwoPointRectangle(
-            futil.core.Point3D.create(0,0,0),
-            futil.core.Point3D.create(self._width,self._length,0),                                              
+            futil.core.Point3D.create(self._x,self._y,self._z),
+            futil.core.Point3D.create(self._x + self._width, self._y + self._length,  self._z),
         )
 
         rect_sub_walls = lines.addTwoPointRectangle(
-            futil.core.Point3D.create(self._wall_thickness, self._wall_thickness, 0),
-            futil.core.Point3D.create(self._width - self._wall_thickness,self._length - self._wall_thickness, 0)
+            futil.core.Point3D.create(self._x + self._wall_thickness, self._y + self._wall_thickness, self._z),
+            futil.core.Point3D.create(self._x + self._width - self._wall_thickness, self._y + self._length - self._wall_thickness, self._z)
         )
 
         return sketch
